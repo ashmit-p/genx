@@ -1,70 +1,66 @@
-// import { NextRequest, NextResponse } from 'next/server'
-// import { createClient } from '@supabase/supabase-js'
-// import { sanitizeSearchParam } from '@/lib/sanitize-search-params'
-
-// const supabase = createClient(
-//   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-//   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-// )
-
-// export async function GET(req: NextRequest) {
-
-//   const { searchParams } = new URL(req.url)
-//   const rawSearch = searchParams.get('search') ?? undefined
-//   const search = sanitizeSearchParam(rawSearch)
-
-//    let query = supabase.from('blogs').select('*').order('created_at', { ascending: false })
-   
-   
-
-//   if (search) {
-//     query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,slug.ilike.%${search}`)
-//   }
-
-//   const { data: blogs, error } = await query
-
-//   if (error) {
-//     return NextResponse.json({ error: error.message }, { status: 500 })
-//   }
-//   // console.log("BLOGS", NextResponse.json({ blogs }));
-//   return NextResponse.json({ blogs })
-// }
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseServer } from '@/lib/supabase/server';
+import { adminDb, adminAuth } from '@/lib/firebase-admin';
 
 export async function GET(req: NextRequest) {
-  const supabase = supabaseServer();
   const { searchParams } = new URL(req.url);
   const search = searchParams.get('search')?.trim() || '';
 
-  // const {
-  //   data: { user },
-  // } = await supabase.auth.getUser();
+  try {
+    const authHeader = req.headers.get('authorization');
+    const token = authHeader?.split(' ')[1];
+    
+    let userId: string | null = null;
+    if (token) {
+      try {
+        const decodedToken = await adminAuth.verifyIdToken(token);
+        userId = decodedToken.uid;
+      } catch {
+        // continue w/o user info
+      }
+    }
 
-  const { data: blogs, error: blogError } = await supabase
-    .from('blogs')
-    .select('id, slug, title, description, created_at, likes')
-    .ilike('title', `%${search}%`)
-    .order('likes', {ascending: false})
-    .order('created_at', { ascending: false }); 
+    // Get blogs 
+    const blogsRef = adminDb.collection('blogs');
+    const query = blogsRef.orderBy('likes', 'desc').orderBy('created_at', 'desc');
 
-  if (blogError) {
-    return NextResponse.json({ blogs: [], likedIds: [], error: blogError.message }, { status: 500 });
+    const snapshot = await query.get();
+    
+    let blogs = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Array<{
+      id: string;
+      title?: string;
+      description?: string;
+      likes?: number;
+      created_at?: string;
+      slug?: string;
+      content?: string;
+      user_id?: string;
+    }>;
+
+    // Filter by search term if provided
+    if (search) {
+      const searchLower = search.toLowerCase();
+      blogs = blogs.filter(blog => 
+        blog.title?.toLowerCase().includes(searchLower) ||
+        blog.description?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Get liked blog IDs for the user
+    let likedIds: string[] = [];
+    if (userId) {
+      const likesSnapshot = await adminDb.collection('blog_likes')
+        .where('user_id', '==', userId)
+        .get();
+      
+      likedIds = likesSnapshot.docs.map(doc => doc.data().blog_id);
+    }
+
+    return NextResponse.json({ blogs, likedIds });
+  } catch (error) {
+    console.error('Error fetching blogs:', error);
+    return NextResponse.json({ blogs: [], likedIds: [], error: 'Internal server error' }, { status: 500 });
   }
-
-  // let likedIds: string[] = [];
-  // if (user) {
-  //   const { data: likes, error: likesError  } = await supabase
-  //     .from('blog_likes')
-  //     .select('blog_id')
-  //     .eq('user_id', user.id);
-
-  //   if (!likesError && likes)
-  //   likedIds = likes?.map((like) => like.blog_id) || [];
-  // }
-
-
-  // console.log('User:', user)
-
-  return NextResponse.json({ blogs });
 }

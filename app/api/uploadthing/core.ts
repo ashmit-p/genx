@@ -1,6 +1,6 @@
 import { createUploadthing, type FileRouter } from 'uploadthing/server'
 import { cookies } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
+import { adminAuth } from '@/lib/firebase-admin'
 
 const f = createUploadthing()
 
@@ -8,22 +8,22 @@ export const ourFileRouter = {
   avatarUploader: f({ image: { maxFileSize: '2MB', maxFileCount: 1 } })
     .middleware(async () => {
       const cookieStore = await cookies(); 
-      const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          cookies: {
-            getAll: () => cookieStore.getAll(), 
-          },
-        }
-      );
+      
+      // Get Firebase auth token from cookies and verify
+      const authToken = cookieStore.get('__session')?.value;
+      
+      if (!authToken) {
+        throw new Error('Unauthorized: No auth token');
+      }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) throw new Error('Unauthorized');
-      return { userId: user.id };
+      try {
+        // Verify Firebase token using Admin SDK
+        const decodedToken = await adminAuth.verifyIdToken(authToken);
+        return { userId: decodedToken.uid };
+      } catch (error) {
+        console.error('Token verification failed:', error);
+        throw new Error('Unauthorized: Invalid token');
+      }
     })
     .onUploadComplete(async ({ file, metadata }) => {
       console.log('Upload complete:', file.url, 'by user:', metadata.userId);
@@ -35,8 +35,7 @@ export const ourFileRouter = {
         },  
         body: JSON.stringify({
           userId: metadata.userId,
-          // avatarUrl: file.ufsUrl, 
-          avatarUrl: file.ufsUrl.replace(/https:\/\/[^.]+\.utfs\.io/, 'https://utfs.io')
+          avatarUrl: file.url
         }),
       });
 

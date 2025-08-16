@@ -1,25 +1,36 @@
 'use client'
 
-import { useState } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { useState, useEffect } from 'react'
+import { auth } from '@/lib/firebase'
+import { updatePassword, onAuthStateChanged, type User } from 'firebase/auth'
 import { useRouter } from 'next/navigation'
 
 export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState('')
   const [error, setError] = useState('')
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user)
+    })
+    return () => unsubscribe()
+  }, [])
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    })
+    if (!currentUser) {
+      setError('You must be logged in to reset your password')
+      return
+    }
 
-    if (error) {
-      setError(error.message)
-    } else {
+    try {
+      await updatePassword(currentUser, newPassword)
       router.push('/login')
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to update password')
     }
   }
 

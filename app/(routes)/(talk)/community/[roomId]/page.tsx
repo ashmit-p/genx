@@ -1,104 +1,98 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
-// import { useEffect, useState } from 'react';
-// import { useSocket } from '@/lib/useSocket';
-// import { useParams } from 'next/navigation';
-// import { createClient } from '@supabase/supabase-js';
-// import useUser from '@/lib/hooks/useUser';
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import useUser from '@/lib/hooks/useUser';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import ChatPage from '@/components/Chat';
 
-// const supabase = createClient(
-//   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-//   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-// );
-
-type Message = {
+interface ChatRoom {
   id: string;
-  username: string;
-  content: string;
-  inserted_at: string;
-};
+  name: string;
+  description: string;
+}
 
 export default function RoomChatPage() {
-//   const { roomId } = useParams();
-//   const { user } = useUser(); 
-//  const socketRef = useSocket(user?.accessToken);
-//   const [messages, setMessages] = useState<Message[]>([]);
-//   const [input, setInput] = useState('');
+  const { roomId } = useParams();
+  const { user } = useUser();
+  const [room, setRoom] = useState<ChatRoom | null>(null);
+  const [loading, setLoading] = useState(true);
 
-//   useEffect(() => {
-//     if (!socketRef.current || !roomId) return;
+  useEffect(() => {
+    if (!roomId || typeof roomId !== 'string' || !user?.accessToken) return;
 
-//     socketRef.current.emit('join_room', roomId);
-
-//     socketRef.current.on('receive_message', (msg: Message) => {
-//       setMessages((prev) => [...prev, msg]);
-//     });
-
-//     return () => {
-//       socketRef.current?.off('receive_message');
-//     };
-//   }, [roomId, socketRef.current]);
-
-//   // Fetch message history
-//   useEffect(() => {
-//     const loadHistory = async () => {
-//       const { data, error } = await supabase
-//         .from('chat_messages')
-//         .select('id, username, content, inserted_at')
-//         .eq('room_id', roomId)
-//         .order('inserted_at');
-
-//         if(error) console.log("Error sending message", error);
+    const fetchRoom = async () => {
+      try {
+        const headers: HeadersInit = {}
         
-//         console.log("Received messages : ", data);
+        if (user?.accessToken) {
+          headers['Authorization'] = `Bearer ${user.accessToken}`
+        }
         
-//       if (data) setMessages(data);
-//     };
+        const response = await fetch(`/api/chat/rooms/${roomId}`, {
+          headers,
+        })
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            console.error('Room not found')
+            setRoom(null)
+            return
+          }
+          throw new Error('Failed to fetch room details')
+        }
+        
+        const data = await response.json()
+        setRoom(data.room)
+      } catch (error) {
+        console.error('Error fetching room:', error);
+        setRoom(null)
+      } finally {
+        setLoading(false);
+      }
+    };
 
-//     loadHistory();
-//   }, [roomId]);
+    fetchRoom();
+  }, [roomId, user?.accessToken]);
 
-//   const sendMessage = () => {
-//     if (!input.trim() || !user) return;
+  if (loading) {
+    return (
+      <ProtectedRoute>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
 
-//     socketRef.current?.emit('send_message', {
-//       room_id: roomId,
-//       user_id: user.id,
-//       username: user.email || 'Anonymous',
-//       message: input
-//     });
-
-//     setInput('');
-//   };
+  if (!room) {
+    return (
+      <ProtectedRoute>
+        <div className="text-center py-12">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Chat room not found
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            The chat room you&apos;re looking for doesn&apos;t exist or has been removed.
+          </p>
+        </div>
+      </ProtectedRoute>
+    );
+  }
 
   return (
-    // <div className="p-4 max-w-md mx-auto">
-    //   <h1 className="text-xl font-semibold mb-2">Chat Room: {roomId}</h1>
-
-    //   <div className="h-64 overflow-y-scroll bg-gray-100 rounded p-2 mb-2">
-    //     {messages.map((msg) => (
-    //       <div key={msg.id} className="mb-1">
-    //         <strong>{msg.username}:</strong> {msg.content}
-    //       </div>
-    //     ))}
-    //   </div>
-
-    //   <input
-    //     className="border rounded px-2 py-1 mr-2 w-2/3"
-    //     placeholder="Type your message..."
-    //     value={input}
-    //     onChange={(e) => setInput(e.target.value)}
-    //     onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-    //   />
-    //   <button
-    //     className="bg-blue-500 text-white px-3 py-1 rounded"
-    //     onClick={sendMessage}
-    //   >
-    //     Send
-    //   </button>
-    // </div>
-    <ChatPage />
+    <ProtectedRoute>
+      <div className="h-full">
+        <div className="border-b border-gray-200 dark:border-gray-700 p-4">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+            {room.name}
+          </h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {room.description}
+          </p>
+        </div>
+        <ChatPage />
+      </div>
+    </ProtectedRoute>
   );
 }

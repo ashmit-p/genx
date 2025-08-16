@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import { getGeminiResponse } from './lib/ai/gemini';
-import { createClient } from '@supabase/supabase-js';
-import { supabaseAdmin } from './supabaseAdmin';
+import { db } from './firebase';
+import { getAuth } from 'firebase-admin/auth';
 import { Server, Socket } from 'socket.io';
 import Redis from 'ioredis';
 
@@ -34,28 +34,13 @@ export default function socketHandler(io: Server) {
       return next(new Error('Unauthorized: No token provided'));
     }
 
-    const supabaseWithToken = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      }
-    );
-
-
-    const { data, error } = await supabaseWithToken.auth.getUser();
-    
-    if (error || !data?.user) {
+    try {
+      const decodedToken = await getAuth().verifyIdToken(token);
+      socket.data.user = decodedToken;
+      next();
+    } catch (error) {
       return next(new Error('Unauthorized: Invalid token'));
     }
-    
-    socket.data.user = data.user;
-    socket.data.supabase = supabaseWithToken;
-    next();
   });
 
 
@@ -74,10 +59,15 @@ export default function socketHandler(io: Server) {
       try {
         await redis.del(`context:${roomId}`);
 
-        await supabaseAdmin
-          .from('ai_messages')
-          .delete()
-          .eq('room_id', roomId)
+        const aiMessagesRef = db.collection('ai_messages');
+        const messagesQuery = aiMessagesRef.where('room_id', '==', roomId);
+        const snapshot = await messagesQuery.get();
+        
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
 
         socket.emit('chat_reset_success');
       } catch (err) {
@@ -93,131 +83,92 @@ export default function socketHandler(io: Server) {
       if (!user) return socket.emit('error', 'Unauthorized');
 
       const { room_id, message } = data;
-      const supabase = socket.data.supabase;
-
       const isAIChat = room_id.startsWith('ai-');
 
-      const { data: userRow, error: userError } = await supabase
-        .from('users')
-        .select('username, avatar_url')
-        .eq('id', user.id)
-        .single();
+      try {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        const userData = userDoc.data();
+        const username = userData?.username || 'Anonymous';
+        const avatar_url = userData?.avatar_url || '';
 
-      const username = userRow?.username || 'Anonymous';
-      const avatar_url = userRow?.avatar_url || ''; 
+        if (isAIChat) {
+          const aiMessagesRef = db.collection('ai_messages');
+          const countQuery = aiMessagesRef.where('room_id', '==', room_id);
+          const countSnapshot = await countQuery.get();
+          
+          if (countSnapshot.size >= 200) {
+            return socket.emit('error', 'Chat limit reached. Please reset the chat to continue.');
+          }
 
-      if (isAIChat) {
-
-        const { count, error: countError } = await supabase
-          .from('ai_messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('room_id', room_id);
-
-        if (countError || count === null) {
-          console.error('Failed to get message count:', countError);
-          return socket.emit('error', 'Failed to check message limit');
-        }
-
-        if (count >= 200) {
-          return socket.emit('error', 'Chat limit reached. Please reset the chat to continue.');
-        }
-
-
-        const { error: insertUserError } = await supabase.from('ai_messages').insert([
-          {
+          const userMessage = {
             room_id,
-            user_id: user.id,
+            user_id: user.uid,
             role: 'user',
             content: message,
             avatar_url,
+            inserted_at: new Date(),
+          };
+          
+          const userDoc = await aiMessagesRef.add(userMessage);
+          await saveMessageToContext(room_id, `User: ${message}`);
+          const contextMessages = await getContextMessages(room_id);
+
+          io.to(room_id).emit('receive_message', {
+            id: userDoc.id,
+            room_id,
+            user_id: user.uid,
+            username: 'You',
+            avatar_url,
+            content: message,
             inserted_at: new Date().toISOString(),
-          },
-        ]);
+          });
 
-        await saveMessageToContext(room_id, `User: ${message}`);
-        const contextMessages = await getContextMessages(room_id);
+          const botReply = await getGeminiResponse(message, contextMessages);
 
-        if (insertUserError) {
-          console.error('Failed to insert user AI message:', insertUserError);
-          return socket.emit('error', 'Failed to save message');
-        }
-
-        io.to(room_id).emit('receive_message', {
-          id: Date.now(), 
-          room_id,
-          user_id: user.id,
-          username: 'You',
-          avatar_url,
-          content: message,
-          inserted_at: new Date().toISOString(),
-        });
-
-        const botReply = await getGeminiResponse(message, contextMessages);
-
-        const { data: botInserted, error: botInsertError } = await supabase
-          .from('ai_messages')
-          .insert([
-            {
-              room_id,
-              user_id: user.id, 
-              role: 'assistant',
-              content: botReply,
-              avatar_url: '/bot-avatar.jpg',
-              inserted_at: new Date().toISOString(),
-            },
-          ])
-          .select();
-
-
-        if (botInsertError || !botInserted) {
-          console.error('Failed to insert AI reply:', botInsertError);
-          return socket.emit('error', 'AI response failed');
-        }
-
-        // THIS IS THE BOT REPLY
-
-        io.to(room_id).emit('receive_message', {                                
-          id: botInserted[0].id,
-          room_id,
-          user_id: user.id,
-          username: 'TherapistBot',
-          content: botInserted[0].content,
-          avatar_url,
-          inserted_at: botInserted[0].inserted_at,
-        });
-
-        await saveMessageToContext(room_id, `AI: ${botReply}`);
-
-      } else {
-
-        // COMMUNITY MESSAGE 
-
-        const { data: inserted, error } = await supabase
-          .from('chat_messages')
-          .insert([
-            {
-              room_id,
-              user_id: user.id,
-              username,
-              content: message,
-              avatar_url,
-              inserted_at: new Date().toISOString(),
-            },
-          ])
-          .select();
-
-          const messageToEmit = {
-            ...inserted[0],
-            avatar_url, 
+          const botMessage = {
+            room_id,
+            user_id: user.uid,
+            role: 'assistant',
+            content: botReply,
+            avatar_url: '/bot-avatar.jpg',
+            inserted_at: new Date(),
           };
 
-        if (error || !inserted) {
-          console.error('Insert error:', error);
-          socket.emit('error', 'Failed to save message');
-          return;
-        }
+          const botDoc = await aiMessagesRef.add(botMessage);
 
-        io.to(room_id).emit('receive_message', messageToEmit);
+          io.to(room_id).emit('receive_message', {
+            id: botDoc.id,
+            room_id,
+            user_id: user.uid,
+            username: 'TherapistBot',
+            content: botReply,
+            avatar_url: '/bot-avatar.jpg',
+            inserted_at: new Date().toISOString(),
+          });
+
+          await saveMessageToContext(room_id, `AI: ${botReply}`);
+
+        } else {
+          const chatMessage = {
+            room_id,
+            user_id: user.uid,
+            username,
+            content: message,
+            avatar_url,
+            inserted_at: new Date(),
+          };
+
+          const chatDoc = await db.collection('chat_messages').add(chatMessage);
+
+          io.to(room_id).emit('receive_message', {
+            id: chatDoc.id,
+            ...chatMessage,
+            inserted_at: new Date().toISOString(),
+          });
+        }
+      } catch (error) {
+        console.error('Error handling message:', error);
+        socket.emit('error', 'Failed to save message');
       }
     });
 

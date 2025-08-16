@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase/server'
+import { adminDb } from '@/lib/firebase-admin'
 
 export async function POST(req: NextRequest) {
   const { userId, avatarUrl } = await req.json()
@@ -8,14 +8,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing data' }, { status: 400 })
   }
 
-  const { error } = await supabaseAdmin
-    .from('users')
-    .update({ avatar_url: avatarUrl })
-    .eq('id', userId)
+  try {
+    await adminDb.collection('users').doc(userId).update({
+      avatar_url: avatarUrl
+    })
 
-  if (error) {
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Failed to update avatar:', error)
     return NextResponse.json({ error: 'Failed to update avatar' }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true })
 }

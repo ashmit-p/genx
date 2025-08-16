@@ -1,11 +1,9 @@
-import { supabase } from './supabase/client'
+import { db } from './firebase'
+import { collection, getDocs, query, orderBy } from 'firebase/firestore'
 
 export async function getBlogs() {
-  const { data, error } = await supabase
-    .from('blogs')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (error) throw error
-  return data
+  const blogsRef = collection(db, 'blogs');
+  const q = query(blogsRef, orderBy('created_at', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }

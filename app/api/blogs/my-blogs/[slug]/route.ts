@@ -1,25 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseServer } from '@/lib/supabase/server';
+import { adminDb } from '@/lib/firebase-admin';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
-  const supabase = supabaseServer();
+  try {
+    const { slug } = await params
+    
+    const blogsSnapshot = await adminDb
+      .collection('blogs')
+      .where('written_by', '==', slug)
+      .orderBy('created_at', 'desc')
+      .get();
 
-//   const {
-//     data: { user },
-//   } = await supabase.auth.getUser();
+    const blogs = blogsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      created_at: doc.data().created_at?.toDate()?.toISOString() || null,
+    }));
 
-  const { data: blogs, error } = await supabase
-    .from('blogs')
-    .select('*')
-    .eq('written_by', params.slug)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ blogs }, { status: 200 });
+  } catch (error) {
+    console.error('Error fetching user blogs:', error);
+    return NextResponse.json({ error: 'Failed to fetch blogs' }, { status: 500 });
   }
-
-  return NextResponse.json({ blogs }, { status: 200 });
 }

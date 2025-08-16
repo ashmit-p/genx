@@ -1,16 +1,24 @@
-// components/SupabaseProvider.tsx
+// components/FirebaseProvider.tsx
 'use client'
 
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
-import { SessionContextProvider } from '@supabase/auth-helpers-react'
-import { useState } from 'react'
+import { createContext, useContext } from 'react'
+import { auth } from '@/lib/firebase'
+import { Auth } from 'firebase/auth'
 
-export function SupabaseProvider({ children }: { children: React.ReactNode }) {
-  const [supabase] = useState(() => createPagesBrowserClient())
+const FirebaseContext = createContext<{ auth: Auth } | null>(null);
 
+export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   return (
-    <SessionContextProvider supabaseClient={supabase}>
+    <FirebaseContext.Provider value={{ auth }}>
       {children}
-    </SessionContextProvider>
+    </FirebaseContext.Provider>
   )
+}
+
+export function useFirebase() {
+  const context = useContext(FirebaseContext);
+  if (!context) {
+    throw new Error('useFirebase must be used within a FirebaseProvider');
+  }
+  return context;
 }

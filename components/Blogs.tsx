@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import LikeButton from './LikeButton'
 import useUser from '@/lib/hooks/useUser'
-import { supabase } from '@/lib/supabase/client'
 
 type Blog = {
   id: string
@@ -41,25 +40,10 @@ export default function Blogs({ search }: { search: string }) {
       }
     };
     fetchBlogs();
-  }, [search]);
+  }, [search, user?.accessToken]);
 
 
-  useEffect(() => {
-    const fetchLikes = async () => {
-      const { data, error } = await supabase
-        .from('blog_likes')
-        .select('blog_id')
-        .eq('user_id', user?.id);
-
-      if (!error && data) {
-        setLikedIds(data.map((like) => like.blog_id));
-      }
-    };
-
-    if (user) {
-      fetchLikes();
-    }
-  }, [user]);
+  // Likes are now fetched through the API route above, so we can remove the direct Supabase call
 
 
   return (

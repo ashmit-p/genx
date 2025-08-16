@@ -1,21 +1,21 @@
 version: '3.8'
 
 services:
-  redis:
+  genx-redis:
     image: redis
-    container_name: redis
+    container_name: genx-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"  # Use port 6380 on host to avoid conflicts
 
-  ws-server:
+  genx-ws-server:
     build: ./ws-server
-    container_name: ws-server
+    container_name: genx-ws-server
     ports:
-      - "4000:4000"
+      - "4000:4000"  # Use port 4001 on host to avoid conflicts
     depends_on:
-      - redis
+      - genx-redis
     environment:
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://genx-redis:6379  # Internal container communication
     volumes:
       - ./ws-server:/app
     command: npm run dev

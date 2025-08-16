@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { getAuth, onAuthStateChanged, User } from 'firebase/auth'
+import { db } from '@/lib/firebase'
+import { doc, getDoc } from 'firebase/firestore'
 
 type UserData = {
   id: string
@@ -12,121 +14,49 @@ type UserData = {
   accessToken?: string | undefined
 }
 
-// export default function useUser() {
-//   const [user, setUser] = useState<UserData | null>(null)
-//   const [loading, setLoading] = useState(true)
-
-//   useEffect(() => {
-//     const getUser = async () => {
-//       const {
-//         data: { session },
-//       } = await supabase.auth.getSession()
-
-//       if (!session?.user) {
-//         setUser(null)
-//         setLoading(false)
-//         return
-//       }
-
-//       const { data: authData, error: authError } = await supabase.auth.getUser()
-//       const { data: profile, error: profileError } = await supabase
-//         .from('users')
-//         .select('id, role, username, avatar_url')
-//         .eq('id', session.user.id)
-//         .single()
-
-//       if (!authError && !profileError && profile && authData?.user) {
-//         setUser({
-//           id: profile.id,
-//           role: profile.role,
-//           username: profile.username || '',
-//           email: authData.user.email || '',
-//           avatar_url: profile.avatar_url || '',
-//           accessToken: session.access_token
-//         })
-//       }
-
-//       setLoading(false)
-//     }
-
-//     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-//       async (event, session) => {
-//         if (session) {
-//           getUser()
-//         } else {
-//           setUser(null)
-//         }
-//       }
-//     )
-
-//     getUser()
-
-//     return () => {
-//       subscription.unsubscribe()
-//     }
-//   }, [])
-
-  
-
-//   return { user, loading }
-// }
 export default function useUser() {
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const getUser = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    if (!session?.user) {
+  const getUser = async (firebaseUser: User | null) => {
+    if (!firebaseUser) {
       setUser(null)
       setLoading(false)
       return
     }
 
-    const { data: authData, error: authError } = await supabase.auth.getUser()
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('id, role, username, avatar_url')
-      .eq('id', session.user.id)
-      .single()
-
-    if (authError) console.error('[useUser] authError:', authError)
-if (profileError) console.error('[useUser] profileError:', profileError)
-
-
-    if (!authError && !profileError && profile && authData?.user) {
-      setUser({
-        id: profile.id,
-        role: profile.role,
-        username: profile.username || '',
-        email: authData.user.email || '',
-        accessToken: session.access_token,
-        avatar_url: profile.avatar_url || '',
-      })
+    try {
+      const userDoc = doc(db, 'users', firebaseUser.uid)
+      const userSnap = await getDoc(userDoc)
+      
+      if (userSnap.exists()) {
+        const profile = userSnap.data()
+        setUser({
+          id: firebaseUser.uid,
+          role: profile.role || '',
+          username: profile.username || '',
+          email: firebaseUser.email || '',
+          avatar_url: profile.avatar_url || '',
+          accessToken: await firebaseUser.getIdToken()
+        })
+      }
+    } catch (error) {
+      console.error('[useUser] Error fetching user profile:', error)
     }
 
     setLoading(false)
   }
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session) {
-          getUser()
-        } else {
-          setUser(null)
-        }
-      }
-    )
-
-    getUser()
+    const auth = getAuth()
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      getUser(firebaseUser)
+    })
 
     return () => {
-      subscription.unsubscribe()
+      unsubscribe()
     }
   }, [])
 
-  return { user, loading, refetch: getUser } // 🆕 add refetch
+  return { user, loading, refetch: () => getUser(getAuth().currentUser) }
 }

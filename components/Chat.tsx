@@ -10,7 +10,7 @@ import { useParams, usePathname } from 'next/navigation';
 import { fetchChatHistory } from '@/lib/messages';
 import { Virtuoso } from 'react-virtuoso';
 import ProtectedRoute from './ProtectedRoute';
-import { motion, AnimatePresence} from 'framer-motion'
+import { motion } from 'framer-motion'
 
 
 type Message = {
@@ -29,7 +29,7 @@ export default function ChatPage() {
   const isAIChat = path?.includes('/chat');
   const isCommunityChat = path?.includes('/community');
 
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
   
   const para = useParams().roomId;
   const roomId = isAIChat && user ? `ai-${user.id}` : para;
@@ -39,7 +39,8 @@ export default function ChatPage() {
   const socketRef = useSocket(user?.accessToken);
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasMore, setHasMore] = useState(true); 
-  const [page, setPage] = useState(1); 
+  const [lastMessageId, setLastMessageId] = useState<string | null>(null);
+  const [lastTimestamp, setLastTimestamp] = useState<string | null>(null);
   const [firstItemIndex, setFirstItemIndex] = useState(0);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -100,25 +101,44 @@ export default function ChatPage() {
     return () => {
       socket.off('receive_message', handleReceive);
     };
-  }, [roomId, socketRef.current]);
+  }, [roomId, socketRef, isAIChat, user?.id]);
 
   useEffect(() => {
     const loadInitialMessages = async () => {
-      if (!roomId) return;
+      if (!roomId || userLoading) return;
       setLoading(true);
-      const initial = await fetchChatHistory(roomId as string, 1);
-      setMessages(initial);
+      const result = await fetchChatHistory(roomId as string, 10);
+      setMessages(result.messages);
+      setHasMore(result.hasMore);
+      setLastMessageId(result.lastMessageId);
+      setLastTimestamp(result.lastTimestamp); 
       setLoading(false);
       setFirstItemIndex(0);
+      
     };
 
     loadInitialMessages();
-  }, [roomId]);
+  }, [roomId, userLoading]);
 
 
   const sendMessage = (e?: React.FormEvent) => {
+    console.log("SENDING MESSAGE");
+    console.log("input:", input);
+    console.log("user:", user);
+    console.log("socketRef.current:", socketRef.current);
+    console.log("roomId:", roomId);
+    console.log("socket connected:", socketRef.current?.connected);
+    
     e?.preventDefault();
-    if (!input.trim() || !user || !socketRef.current || !roomId) return;
+    if (!input.trim() || !user || !socketRef.current || !roomId) {
+      console.log("Send blocked - missing requirements:", {
+        hasInput: !!input.trim(),
+        hasUser: !!user,
+        hasSocket: !!socketRef.current,
+        hasRoomId: !!roomId
+      });
+      return;
+    }
 
     const payload = {
       room_id: roomId,
@@ -128,6 +148,7 @@ export default function ChatPage() {
       message: input,
     };
 
+    console.log("Emitting send_message with payload:", payload);
     socketRef.current.emit('send_message', payload);
 
   };
@@ -142,8 +163,10 @@ export default function ChatPage() {
 
     socketRef.current.once('chat_reset_success', () => {
       setMessages([]);
-      setPage(1);
       setHasMore(true);
+      setLastMessageId(null);
+      setLastTimestamp(null);
+      setFirstItemIndex(0);
     });
 
     socketRef.current.once('error', (err: string) => {
@@ -160,7 +183,6 @@ export default function ChatPage() {
       >
         <div className="flex-1 flex flex-col max-w-6xl mx-auto mt-8">
 
-          {/* Header */}
           <div className="px-6 py-4 border-b border-gray-300 dark:border-gray-700 flex w-full justify-between max-md:justify-end items-center bg-white dark:bg-gray-900 rounded-t-xl shadow-sm">
             <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 max-md:hidden">
               {headerText}
@@ -178,25 +200,39 @@ export default function ChatPage() {
           </div>
 
           {/* Message List */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden relative">
+            {loading && hasMore && messages.length > 0 && (
+              <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-10 bg-white dark:bg-gray-800 rounded-full px-3 py-2 shadow-md">
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Loading more messages...</span>
+                </div>
+              </div>
+            )}
             <Virtuoso
               data={messages}
               followOutput
               initialTopMostItemIndex={messages.length - 1}
               overscan={200}
               startReached={async () => {
-                if (!hasMore || loading || !roomId) return;
+                if (!hasMore || loading || !roomId || !lastMessageId || !lastTimestamp) return;
 
-                const nextPage = page + 1;
                 setLoading(true);
-                const olderMessages = await fetchChatHistory(roomId as string, nextPage);
+                const result = await fetchChatHistory(
+                  roomId as string, 
+                  10, 
+                  lastMessageId, 
+                  lastTimestamp
+                );
 
-                if (olderMessages.length === 0) {
+                if (result.messages.length === 0) {
                   setHasMore(false);
                 } else {
-                  setMessages((prev) => [...olderMessages, ...prev]);
-                  setFirstItemIndex((prevIndex) => prevIndex - olderMessages.length);
-                  setPage(nextPage);
+                  setMessages((prev) => [...result.messages, ...prev]);
+                  setFirstItemIndex((prevIndex) => prevIndex - result.messages.length);
+                  setLastMessageId(result.lastMessageId);
+                  setLastTimestamp(result.lastTimestamp);
+                  setHasMore(result.hasMore);
                 }
 
                 setLoading(false);
@@ -273,27 +309,42 @@ export default function ChatPage() {
                 );
               }}
               components={{
-                Header: isAIChat
-                  ? () => (
-                      <div className="flex items-start space-x-4 px-6 pt-6 pb-2">
-                        <div className="h-10 w-10 rounded-full flex items-center justify-center text-white">
-                          {/* <User /> */}
-                          <Image src="/bot-avatar.jpg" alt='Bot' height={45} width={45} className='rounded-full self-center' />
-                        </div>
-                        <div className="flex-1 max-w-[75%] bg-white dark:bg-gray-800 rounded-xl px-4 py-3 shadow">
-                          <p className="text-gray-800 dark:text-gray-100">
-                            Hey! How can I help you today?
-                          </p>
-                        </div>
+                Header: () => {
+                  // Show "no more messages" indicator when we've reached the end
+                  const noMoreMessages = !hasMore && messages.length > 0 && (
+                    <div className="text-center py-2">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        No more messages to load
+                      </span>
+                    </div>
+                  );
+
+                  // Show AI chat welcome message for AI chats
+                  const aiWelcome = isAIChat && (
+                    <div className="flex items-start space-x-4 px-6 pt-6 pb-2">
+                      <div className="h-10 w-10 rounded-full flex items-center justify-center text-white">
+                        <Image src="/bot-avatar.jpg" alt='Bot' height={45} width={45} className='rounded-full self-center' />
                       </div>
-                    )
-                  : undefined,
+                      <div className="flex-1 max-w-[75%] bg-white dark:bg-gray-800 rounded-xl px-4 py-3 shadow">
+                        <p className="text-gray-800 dark:text-gray-100">
+                          Hey! How can I help you today?
+                        </p>
+                      </div>
+                    </div>
+                  );
+
+                  return (
+                    <div>
+                      {noMoreMessages}
+                      {aiWelcome}
+                    </div>
+                  );
+                }
               }}
               style={{ height: '100%' }}
             />
           </div>
 
-          {/* Message Input */}
           <motion.form
             initial={{ opacity : 0 }}
             animate={{ opacity : 1 }}

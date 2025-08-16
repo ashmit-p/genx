@@ -15,10 +15,14 @@ export default function AvatarUploader() {
   const { user, refetch } = useUser();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     if (user?.avatar_url) {
       setAvatarUrl(user.avatar_url);
+      setImageError(false); // Reset image error when URL changes
+      console.log("AVATAR_URL", user.avatar_url);
+      
     }
   }, [user]);
 
@@ -37,6 +41,7 @@ export default function AvatarUploader() {
       }
       await updateUserAvatarUrl(uploadedUrl, user.id);
       setAvatarUrl(uploadedUrl);
+      setImageError(false); // Reset error state on new upload
       toast.success("Avatar updated!");
       refetch();
     } catch (e: any) {
@@ -70,7 +75,7 @@ export default function AvatarUploader() {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {avatarUrl ? (
+      {avatarUrl && !imageError ? (
         <Image
           src={avatarUrl.trim()}
           alt="avatar"
@@ -78,6 +83,13 @@ export default function AvatarUploader() {
           height={96}
           className="rounded-full object-cover border-2 border-emerald-500 cursor-pointer"
           onClick={handleDelete}
+          onError={() => {
+            console.error("Image failed to load:", avatarUrl);
+            setImageError(true);
+            toast.error("Avatar image failed to load");
+          }}
+          priority={false}
+          unoptimized={avatarUrl.includes('ufs.sh')} // Disable optimization for UploadThing URLs
         />
       ) : (
         <div

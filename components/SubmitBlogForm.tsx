@@ -5,36 +5,36 @@ import { useRouter } from 'next/navigation'
 import { Textarea } from './ui/textarea'
 import { Input } from './ui/input'
 import { Button } from './ui/button'
-import { supabase } from '@/lib/supabase/client'
+import { getAuth } from 'firebase/auth'
 import { ChevronDown, ChevronUp } from 'lucide-react'; 
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast';
+import useUser from '@/lib/hooks/useUser'
 
-export default function SubmitBlogForm(
-  // { userId }: { userId: string }
-) {
+export default function SubmitBlogForm() {
   const [title, setTitle] = useState('')
   const [showGuide, setShowGuide] = useState(false);
   const [desc, setDesc] = useState('')
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { user } = useUser()
 
-  
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    
-    // console.log("USERID", userId);
 
-    const session = await supabase.auth.getSession();
+    if (!user?.accessToken) {
+      toast.error('Please log in to submit a blog');
+      setLoading(false)
+      return;
+    }
 
     const res = await fetch('/api/blogs/submit', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.data.session?.access_token}`,
+        Authorization: `Bearer ${user.accessToken}`,
       },
       body: JSON.stringify({ title, content, desc }),
     });

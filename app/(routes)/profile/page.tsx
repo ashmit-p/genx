@@ -1,6 +1,7 @@
 'use client'
 
-import { supabase } from '@/lib/supabase/client'
+import { auth } from '@/lib/firebase'
+import { signOut, sendPasswordResetEmail } from 'firebase/auth'
 import useUser from '@/lib/hooks/useUser'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useRouter } from 'next/navigation'
@@ -14,20 +15,25 @@ export default function ProfilePage() {
   const router = useRouter()
 
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (!error) router.push('/login')
+    try {
+      await signOut(auth)
+      router.push('/login')
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
   }
 
   const handleResetPassword = async () => {
-    if (!user) return
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-
-    if (error) {
-      console.error('Error resetting password:', error.message)
-    } else {
+    if (!user?.email) return
+    
+    try {
+      await sendPasswordResetEmail(auth, user.email, {
+        url: `${window.location.origin}/reset-password`,
+      })
       alert('Check your email for the password reset link')
+    } catch (error) {
+      console.error('Error resetting password:', error)
+      alert('Error sending password reset email. Please try again.')
     }
   }
 
@@ -41,7 +47,7 @@ export default function ProfilePage() {
           transition={{ duration: 0.5 }}
         >
           <div className="w-full flex justify-center items-center mb-6">
-            <AvatarUploader />
+          <AvatarUploader />
           </div>
 
           <motion.h1

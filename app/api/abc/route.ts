@@ -1,39 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
+import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import { cookies } from 'next/headers'
 
 export async function POST(req: NextRequest) {
-  const body = await req.json()
-  const { publicUrl } = body
+  try {
+    const body = await req.json()
+    const { publicUrl } = body
 
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-      },
+    const cookieStore = await cookies()
+    const token = cookieStore.get('__session')?.value
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-  )
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
+    const decodedToken = await adminAuth.verifyIdToken(token)
+    const userId = decodedToken.uid
 
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+    // Update user's avatar URL in Firestore
+    await adminDb.collection('users').doc(userId).update({
+      avatar_url: publicUrl,
+      updated_at: new Date(),
+    })
 
-  const { error } = await supabase
-    .from('users')
-    .update({ avatar_url: publicUrl })
-    .eq('id', user.id)
-
-  if (error) {
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error updating avatar:', error)
     return NextResponse.json({ error: 'Failed to update avatar' }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true })
 }

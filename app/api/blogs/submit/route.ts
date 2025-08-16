@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase/server';
+import { adminDb, adminAuth } from '@/lib/firebase-admin';
 import slugify from 'slugify';
 
 export async function POST(req: Request) {
@@ -10,54 +10,50 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing access token' }, { status: 401 });
   }
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabaseAdmin.auth.getUser(token);
+  try {
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    const userId = decodedToken.uid;
 
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+    // Fetch username from users collection
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
+    }
 
-  // Fetch username from public.users
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from('users')
-    .select('username')
-    .eq('id', user.id)
-    .single();
+    const userData = userDoc.data();
+    const username = userData?.username;
 
-  if (profileError || !profile?.username) {
-    return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
-  }
+    if (!username) {
+      return NextResponse.json({ error: 'Username not found' }, { status: 404 });
+    }
 
-  let slug = slugify(title, { lower: true, strict: true });
+    let slug = slugify(title, { lower: true, strict: true });
 
-  const { data: existing } = await supabaseAdmin
-    .from('blog_submissions')
-    .select('id')
-    .eq('slug', slug)
-    .maybeSingle();
+    // Check if slug exists in blog_submissions
+    const submissionsRef = adminDb.collection('blog_submissions');
+    const existingSubmission = await submissionsRef.where('slug', '==', slug).get();
 
-  if (existing) {
-    const timestamp = Date.now().toString().slice(-5);
-    slug = `${slug}-${timestamp}`;
-  }
+    if (!existingSubmission.empty) {
+      const timestamp = Date.now().toString().slice(-5);
+      slug = `${slug}-${timestamp}`;
+    }
 
-  const { error } = await supabaseAdmin.from('blog_submissions').insert([
-    {
-      user_id: user.id,
-      username: profile.username,
+    // Create blog submission
+    await submissionsRef.add({
+      user_id: userId,
+      username: username,
       title,
       content,
       description: desc,
       slug,
       status: 'pending',
-    },
-  ]);
+      created_at: new Date().toISOString(),
+    });
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, slug });
+  } catch (error) {
+    console.error('Blog submission error:', error);
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
-  return NextResponse.json({ success: true, slug });
 }

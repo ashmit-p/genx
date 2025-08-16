@@ -10,8 +10,8 @@ type Blog = {
   id: string;
   title: string;
   slug: string;
-  coverImage: string;
-  excerpt: string;
+  content: string;
+  description: string;
 };
 
 const cardVariants: Variants = {
@@ -74,19 +74,19 @@ const Offer = () => {
                 className="bg-white dark:bg-[#1f2937] border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition"
               >
                 <Link href={`/blogs/${blog.slug}`}>
-                  {blog.coverImage && (
+                  {/* {blog.coverImage && (
                     <img
                       src={blog.coverImage}
                       alt={blog.title}
                       className="w-full h-48 object-cover"
                     />
-                  )}
+                  )} */}
                   <div className="p-5">
                     <h3 className="text-xl font-semibold mb-2 text-gray-800 dark:text-white">
                       {blog.title}
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-300 line-clamp-3">
-                      {blog.excerpt}
+                      {blog.description}
                     </p>
                     <div className="mt-4 flex items-center text-pink-500 hover:underline">
                       <span>Read more</span>
