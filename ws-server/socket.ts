@@ -45,11 +45,11 @@ export default function socketHandler(io: Server) {
 
 
   io.on('connection', (socket: Socket) => {
-    console.log('User connected:', socket.data.user.id);
+    console.log('User connected:', socket.data.user.uid);
 
     socket.on('join_room', (roomId: string) => {
       socket.join(roomId);
-      console.log(`${socket.id} joined room ${roomId}`);
+      console.log(`${socket.data.user.uid} (${socket.id}) joined room ${roomId}`);
     });
     
     socket.on('reset_chat', async (roomId: string) => {
