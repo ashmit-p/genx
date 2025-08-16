@@ -61,7 +61,6 @@ export async function GET(req: NextRequest) {
         return bTime.getTime() - aTime.getTime()
       })
 
-      // Find the index of the last message and get the next batch
       const lastIndex = sortedData.findIndex((msg: any) => msg.id === lastMessageId)
       const startIndex = lastIndex > -1 ? lastIndex + 1 : 0
       const data = sortedData.slice(startIndex, startIndex + pageSize)
@@ -78,7 +77,7 @@ export async function GET(req: NextRequest) {
       }))
 
       return NextResponse.json({ 
-        messages: normalized.reverse(), // Return in chronological order
+        messages: normalized.reverse(), 
         hasMore,
         lastMessageId: data.length > 0 ? data[data.length - 1].id : null,
         lastTimestamp: data.length > 0 ? (data[data.length - 1] as any).inserted_at : null

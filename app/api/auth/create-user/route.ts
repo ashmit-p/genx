@@ -13,7 +13,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Verify the user exists in Firebase Auth (optional security check)
     try {
       await adminAuth.getUser(uid)
     } catch (error) {
@@ -23,11 +22,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Create user profile in Firestore
     await adminDb.collection('users').doc(uid).set({
       username: username,
       email: email,
       avatar_url: "",
+      role: "User",
       created_at: new Date(),
       updated_at: new Date(),
     })

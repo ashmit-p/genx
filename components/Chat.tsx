@@ -123,22 +123,9 @@ export default function ChatPage() {
 
   const sendMessage = (e?: React.FormEvent) => {
     console.log("SENDING MESSAGE");
-    console.log("input:", input);
-    console.log("user:", user);
-    console.log("socketRef.current:", socketRef.current);
-    console.log("roomId:", roomId);
-    console.log("socket connected:", socketRef.current?.connected);
     
     e?.preventDefault();
-    if (!input.trim() || !user || !socketRef.current || !roomId) {
-      console.log("Send blocked - missing requirements:", {
-        hasInput: !!input.trim(),
-        hasUser: !!user,
-        hasSocket: !!socketRef.current,
-        hasRoomId: !!roomId
-      });
-      return;
-    }
+    if (!input.trim() || !user || !socketRef.current || !roomId) return;
 
     const payload = {
       room_id: roomId,
@@ -148,7 +135,6 @@ export default function ChatPage() {
       message: input,
     };
 
-    console.log("Emitting send_message with payload:", payload);
     socketRef.current.emit('send_message', payload);
 
   };
@@ -168,6 +154,7 @@ export default function ChatPage() {
       setLastTimestamp(null);
       setFirstItemIndex(0);
     });
+    
 
     socketRef.current.once('error', (err: string) => {
       alert(err || 'Failed to reset chat');
