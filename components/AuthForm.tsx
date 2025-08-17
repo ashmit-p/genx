@@ -58,8 +58,8 @@ export default function AuthForm({ type }: { type: 'login' | 'signup' }) {
         }
         await auth.currentUser?.getIdToken(true);
         
-        toast.success('Account created successfully! You can now login.')
-        router.push("/login")
+        toast.success('Account created successfully! Let us personalize your experience.')
+        router.push("/onboarding")
       }
     } catch (error: unknown) {
       if (error instanceof Error) {
