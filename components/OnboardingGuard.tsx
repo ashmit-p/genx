@@ -36,7 +36,6 @@ export default function OnboardingGuard({
           const hasOnboardingData = !!userData.onboarding_data;
           setOnboardingComplete(hasOnboardingData);
           
-          // Redirect logic
           if (requiresOnboarding && !hasOnboardingData) {
             router.push('/onboarding');
           } else if (!requiresOnboarding && hasOnboardingData) {
@@ -68,12 +67,10 @@ export default function OnboardingGuard({
     );
   }
 
-  // For pages that require onboarding to be complete, don't render if it's not
   if (requiresOnboarding && onboardingComplete === false) {
     return null;
   }
 
-  // For onboarding page itself, don't render if already complete
   if (!requiresOnboarding && onboardingComplete === true) {
     return null;
   }

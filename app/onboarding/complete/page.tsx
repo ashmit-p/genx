@@ -10,7 +10,6 @@ export default function OnboardingComplete() {
   const router = useRouter();
 
   useEffect(() => {
-    // Auto-redirect after 5 seconds
     const timer = setTimeout(() => {
       router.push('/');
     }, 5000);
@@ -26,7 +25,6 @@ export default function OnboardingComplete() {
         transition={{ duration: 0.5 }}
         className="text-center max-w-md mx-auto"
       >
-        {/* Success Icon */}
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -36,7 +34,6 @@ export default function OnboardingComplete() {
           <Check size={40} className="text-white" />
         </motion.div>
 
-        {/* Title */}
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -46,7 +43,6 @@ export default function OnboardingComplete() {
           Welcome to GenX!
         </motion.h1>
 
-        {/* Subtitle */}
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -56,7 +52,6 @@ export default function OnboardingComplete() {
           Thank you for completing your profile! We&rsquo;ve personalized your experience based on your responses. You&rsquo;re all set to start your mental wellness journey.
         </motion.p>
 
-        {/* Features Preview */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -77,7 +72,6 @@ export default function OnboardingComplete() {
           </ul>
         </motion.div>
 
-        {/* Action Buttons */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -99,7 +93,6 @@ export default function OnboardingComplete() {
           </Link>
         </motion.div>
 
-        {/* Auto-redirect notice */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

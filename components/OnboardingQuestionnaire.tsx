@@ -5,26 +5,26 @@ import { motion } from 'framer-motion';
 import { ChevronRight, ChevronLeft, Check } from 'lucide-react';
 
 export interface OnboardingData {
-  // Demographics
+  // Demographic
   age_range: string;
   gender: string;
   location_type: string;
   
-  // Mental Health Background
+  // Bg
   therapy_experience: string;
   current_support: string[];
   comfort_level: number;
   
-  // Goals & Preferences
+  // Goals
   primary_goals: string[];
   preferred_approach: string;
   communication_style: string;
   
-  // Current Challenges
+  // Challenges
   main_challenges: string[];
   stress_level: number;
   
-  // Platform Preferences
+  // Use case
   preferred_features: string[];
   privacy_comfort: number;
   time_availability: string;
@@ -260,7 +260,6 @@ const OnboardingQuestionnaire: React.FC<OnboardingQuestionnaireProps> = ({
     if (currentStep < questions.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      // Fill in default values for missing fields
       const completeData: OnboardingData = {
         age_range: formData.age_range || '',
         gender: formData.gender || '',

@@ -15,12 +15,10 @@ export async function POST(req: NextRequest) {
 
     const onboardingData = await req.json();
 
-    // Validate that we have some data
     if (!onboardingData || typeof onboardingData !== 'object') {
       return NextResponse.json({ error: 'Invalid onboarding data' }, { status: 400 });
     }
 
-    // Update the user document with onboarding data
     await adminDb.collection('users').doc(userId).update({
       onboarding_data: onboardingData,
       onboarding_completed: true,

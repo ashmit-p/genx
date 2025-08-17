@@ -16,7 +16,6 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Redirect if user is not authenticated or already completed onboarding
     if (!userLoading && !user) {
       router.push('/login');
     }
@@ -38,7 +37,6 @@ export default function OnboardingPage() {
       });
 
       if (response.ok) {
-        // Redirect to completion page after successful onboarding
         toast.success('Profile completed successfully!');
         router.push('/onboarding/complete');
       } else {
