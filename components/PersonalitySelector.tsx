@@ -4,11 +4,12 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Heart, Target, Coffee } from 'lucide-react';
 
-export type PersonalityType = 'supportive' | 'practical' | 'friendly';
+export type PersonalityType = 'Supportive Therapist' | 'Practical Coach' | 'Friendly Companion';
 
 interface PersonalitySelectorProps {
   selectedPersonality: PersonalityType;
   onPersonalityChange: (personality: PersonalityType) => void;
+  recommendedBot?: PersonalityType | null;
 }
 
 const personalities = {
@@ -37,24 +38,33 @@ const personalities = {
 
 const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({
   selectedPersonality,
-  onPersonalityChange
+  onPersonalityChange,
+  recommendedBot
 }) => {
   return (
     <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 border border-white/20 shadow-lg">
-      <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">
-        Choose Your AI Therapist Style
-      </h3>
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
+          Choose Your AI Therapist Style
+        </h3>
+        {recommendedBot && (
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+            Based on your preferences, we&rsquo;ve highlighted a recommended option
+          </p>
+        )}
+      </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {Object.entries(personalities).map(([key, personality]) => {
           const IconComponent = personality.icon;
           const isSelected = selectedPersonality === key;
+          const isRecommended = recommendedBot === key;
           
           return (
             <motion.button
               key={key}
               onClick={() => onPersonalityChange(key as PersonalityType)}
-              className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
+              className={`p-4 rounded-xl border-2 transition-all duration-200 text-left relative ${
                 isSelected 
                   ? 'border-rose-300 dark:border-purple-400 shadow-md' 
                   : 'border-transparent hover:border-slate-200 dark:hover:border-slate-600'
@@ -62,6 +72,13 @@ const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
+              {/* Recommended Badge */}
+              {isRecommended && (
+                <div className="absolute -top-2 -right-2 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium shadow-lg">
+                  Recommended
+                </div>
+              )}
+              
               <div className="flex items-start gap-3">
                 <div className={`p-2 rounded-lg bg-gradient-to-br ${personality.color} flex-shrink-0`}>
                   <IconComponent className="w-5 h-5 text-white" />

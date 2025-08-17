@@ -37,7 +37,17 @@ export default function OnboardingPage() {
       });
 
       if (response.ok) {
+        const result = await response.json();
         toast.success('Profile completed successfully!');
+        
+        if (result.recommendedBot) {
+          localStorage.setItem('botRecommendation', JSON.stringify({
+            type: result.recommendedBot,
+            displayName: result.botDisplayName,
+            description: result.botDescription
+          }));
+        }
+        
         router.push('/onboarding/complete');
       } else {
         console.error('Failed to save onboarding data');

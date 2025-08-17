@@ -45,7 +45,16 @@ export default function ChatPage() {
   const [firstItemIndex, setFirstItemIndex] = useState(0);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedPersonality, setSelectedPersonality] = useState<PersonalityType>('supportive');
+  const [selectedPersonality, setSelectedPersonality] = useState<PersonalityType>('Supportive Therapist');
+
+  useEffect(() => {
+    if (user?.recommended_bot) {
+      const recommendedBot = user.recommended_bot as PersonalityType;
+      if (['Supportive Therapist', 'Practical Coach', 'Friendly Companion'].includes(recommendedBot)) {
+        setSelectedPersonality(recommendedBot);
+      }
+    }
+  }, [user?.recommended_bot]);
 
   const headerText = isCommunityChat ? 'Community Chat' : 'AI Therapist';
 
@@ -335,12 +344,12 @@ export default function ChatPage() {
             />
           </div>
 
-          {/* Personality Selector for AI Chat */}
           {isAIChat && (
             <div className="p-4">
               <PersonalitySelector
                 selectedPersonality={selectedPersonality}
                 onPersonalityChange={setSelectedPersonality}
+                recommendedBot={user?.recommended_bot as PersonalityType}
               />
             </div>
           )}

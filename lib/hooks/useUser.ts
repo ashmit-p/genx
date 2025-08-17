@@ -12,6 +12,7 @@ type UserData = {
   role: string
   avatar_url: string | null;
   accessToken?: string | undefined
+  recommended_bot?: string | null;
 }
 
 export default function useUser() {
@@ -37,6 +38,7 @@ export default function useUser() {
           username: profile.username || '',
           email: firebaseUser.email || '',
           avatar_url: profile.avatar_url || '',
+          recommended_bot: profile.recommended_bot,
           accessToken: await firebaseUser.getIdToken()
         })
       }

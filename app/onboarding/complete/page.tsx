@@ -1,18 +1,34 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Sparkles } from 'lucide-react';
+import { Check, Sparkles, Bot } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+interface BotRecommendation {
+  type: string;
+  displayName: string;
+  description: string;
+}
+
 export default function OnboardingComplete() {
   const router = useRouter();
+  const [botRecommendation, setBotRecommendation] = useState<BotRecommendation | null>(null);
 
   useEffect(() => {
+    // Get bot recommendation from localStorage
+    const storedRecommendation = localStorage.getItem('botRecommendation');
+    if (storedRecommendation) {
+      setBotRecommendation(JSON.parse(storedRecommendation));
+      // Clear it from localStorage after using it
+      localStorage.removeItem('botRecommendation');
+    }
+
+    // Auto-redirect after 8 seconds (increased to give time to read bot info)
     const timer = setTimeout(() => {
       router.push('/');
-    }, 5000);
+    }, 8000);
 
     return () => clearTimeout(timer);
   }, [router]);
@@ -51,6 +67,36 @@ export default function OnboardingComplete() {
         >
           Thank you for completing your profile! We&rsquo;ve personalized your experience based on your responses. You&rsquo;re all set to start your mental wellness journey.
         </motion.p>
+
+        {/* Bot Recommendation */}
+        {botRecommendation && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7 }}
+            className="bg-gradient-to-r from-rose-100 to-purple-100 dark:from-rose-900/30 dark:to-purple-900/30 rounded-xl p-6 mb-6 border border-rose-200 dark:border-rose-700"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <Bot className="text-rose-600 dark:text-rose-400" size={24} />
+              <div>
+                <h3 className="font-semibold text-slate-800 dark:text-white">
+                  Your Recommended AI Therapist
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Based on your responses, we&rsquo;ve matched you with:
+                </p>
+              </div>
+            </div>
+            <div className="bg-white/50 dark:bg-slate-800/50 rounded-lg p-4">
+              <h4 className="font-bold text-lg text-slate-800 dark:text-white mb-2">
+                {botRecommendation.displayName}
+              </h4>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                {botRecommendation.description}
+              </p>
+            </div>
+          </motion.div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
