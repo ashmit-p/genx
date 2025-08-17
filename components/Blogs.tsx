@@ -42,10 +42,6 @@ export default function Blogs({ search }: { search: string }) {
     fetchBlogs();
   }, [search, user?.accessToken]);
 
-
-  // Likes are now fetched through the API route above, so we can remove the direct Supabase call
-
-
   return (
     <div className="max-w-7xl mx-auto p-6">
       {loading && (

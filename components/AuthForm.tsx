@@ -34,6 +34,8 @@ export default function AuthForm({ type }: { type: 'login' | 'signup' }) {
       if (type === 'login') {
         const userCredential = await signInWithEmailAndPassword(auth, email, password)
         toast.success('Logged in successfully!')
+        await auth.currentUser?.getIdToken(true);
+        await userCredential.user.getIdToken(true); 
         router.push('/')
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password)
@@ -54,6 +56,7 @@ export default function AuthForm({ type }: { type: 'login' | 'signup' }) {
           const errorData = await response.json()
           throw new Error(errorData.error || 'Failed to create user profile')
         }
+        await auth.currentUser?.getIdToken(true);
         
         toast.success('Account created successfully! You can now login.')
         router.push("/login")

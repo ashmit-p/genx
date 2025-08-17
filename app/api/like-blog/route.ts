@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
+import { FieldValue } from 'firebase-admin/firestore'
 
 export async function POST(req: Request) {
   const authHeader = req.headers.get('authorization')
@@ -15,26 +16,40 @@ export async function POST(req: Request) {
 
     const { blogId } = await req.json()
 
-    // Check if user already liked this blog
     const likesRef = adminDb.collection('blog_likes')
     const querySnapshot = await likesRef
       .where('blog_id', '==', blogId)
       .where('user_id', '==', userId)
       .get()
 
+    const blogRef = adminDb.collection('blogs').doc(blogId)
+
     if (!querySnapshot.empty) {
-      // Unlike: delete the like document
       const likeDoc = querySnapshot.docs[0]
-      await likeDoc.ref.delete()
+      
+      // Use a batch to ensure both operations succeed or fail together
+      const batch = adminDb.batch()
+      batch.delete(likeDoc.ref)
+      batch.update(blogRef, {
+        likes: FieldValue.increment(-1)
+      })
+      
+      await batch.commit()
       return NextResponse.json({ liked: false })
     } else {
-      // Like: create a new like document
       const likeId = `${userId}_${blogId}`
-      await likesRef.doc(likeId).set({
+      
+      const batch = adminDb.batch()
+      batch.set(likesRef.doc(likeId), {
         blog_id: blogId,
         user_id: userId,
         created_at: new Date().toISOString()
       })
+      batch.update(blogRef, {
+        likes: FieldValue.increment(1)
+      })
+      
+      await batch.commit()
       return NextResponse.json({ liked: true })
     }
   } catch (error) {

@@ -1,7 +1,7 @@
 // import AIAdvert from "@/components/AIAdvert";
 import { DockDemo } from "@/components/Dock";
 import Hero from "@/components/Hero";
-import Offer from "@/components/Offer";
+// import Offer from "@/components/Offer";
 
 export default function Home() {
   return (
@@ -11,7 +11,7 @@ export default function Home() {
       </div>
       {/* <div className="flex flex-col -space-y-1"> */}
         <Hero />
-        <Offer />
+        {/* <Offer /> */}
       {/* </div> */}
       {/* <AIAdvert /> */}
     </div>

@@ -10,6 +10,7 @@ import { useParams, usePathname } from 'next/navigation';
 import { fetchChatHistory } from '@/lib/messages';
 import { Virtuoso } from 'react-virtuoso';
 import ProtectedRoute from './ProtectedRoute';
+import PersonalitySelector, { PersonalityType } from './PersonalitySelector';
 import { motion } from 'framer-motion'
 
 
@@ -44,6 +45,7 @@ export default function ChatPage() {
   const [firstItemIndex, setFirstItemIndex] = useState(0);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedPersonality, setSelectedPersonality] = useState<PersonalityType>('supportive');
 
   const headerText = isCommunityChat ? 'Community Chat' : 'AI Therapist';
 
@@ -73,11 +75,11 @@ export default function ChatPage() {
         setMessages((prev) => {
         const newMessages = [...prev, parsedMsg];
 
-        const isFromUser = msg.user_id === user?.id && msg.username !== 'TherapistBot';
+        const isFromUser = msg.user_id === user?.id && msg.user_id !== 'ai-bot';
         if (isAIChat && isFromUser) {
           const thinkingMessage: Message = {
             id: 'pending-bot',
-            user_id: 'bot',
+            user_id: 'ai-bot',
             username: 'TherapistBot',
             content: '...',
             inserted_at: new Date().toISOString(),
@@ -86,7 +88,7 @@ export default function ChatPage() {
           return [...newMessages, thinkingMessage];
         }
 
-        if (msg.username === 'TherapistBot') {
+        if (msg.user_id === 'ai-bot') {
           const withoutPending = prev.filter((m) => !m.pending);
           return [...withoutPending, msg];
         }
@@ -133,10 +135,11 @@ export default function ChatPage() {
       username: user.username || 'Anonymous',
       avatar_url: user.avatar_url || '',
       message: input,
+      ...(isAIChat && { personality: selectedPersonality })
     };
 
     socketRef.current.emit('send_message', payload);
-
+    setInput('');
   };
 
   const resetChat = async () => {
@@ -225,8 +228,8 @@ export default function ChatPage() {
                 setLoading(false);
               }}
               itemContent={(index, msg) => {
-                const isCurrentUser = msg.user_id === user?.id && msg.username !== 'TherapistBot';
-                const isBot = msg.username === 'TherapistBot' || msg.user_id === process.env.BOT_ID;
+                const isCurrentUser = msg.user_id === user?.id && msg.user_id !== 'ai-bot';
+                const isBot = msg.user_id === 'ai-bot' || msg.username === 'TherapistBot';
 
                 return (
                   <div
@@ -331,6 +334,16 @@ export default function ChatPage() {
               style={{ height: '100%' }}
             />
           </div>
+
+          {/* Personality Selector for AI Chat */}
+          {isAIChat && (
+            <div className="p-4">
+              <PersonalitySelector
+                selectedPersonality={selectedPersonality}
+                onPersonalityChange={setSelectedPersonality}
+              />
+            </div>
+          )}
 
           <motion.form
             initial={{ opacity : 0 }}

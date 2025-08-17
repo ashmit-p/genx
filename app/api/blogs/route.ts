@@ -15,11 +15,9 @@ export async function GET(req: NextRequest) {
         const decodedToken = await adminAuth.verifyIdToken(token);
         userId = decodedToken.uid;
       } catch {
-        // continue w/o user info
       }
     }
 
-    // Get blogs 
     const blogsRef = adminDb.collection('blogs');
     const query = blogsRef.orderBy('likes', 'desc').orderBy('created_at', 'desc');
 
@@ -39,7 +37,6 @@ export async function GET(req: NextRequest) {
       user_id?: string;
     }>;
 
-    // Filter by search term if provided
     if (search) {
       const searchLower = search.toLowerCase();
       blogs = blogs.filter(blog => 
@@ -48,7 +45,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get liked blog IDs for the user
     let likedIds: string[] = [];
     if (userId) {
       const likesSnapshot = await adminDb.collection('blog_likes')

@@ -48,7 +48,7 @@ const Offer = () => {
   }, []);
 
   return (
-    <section className="w-full pt-172 px-6 py-16 bg-gradient-to-b from-[#f8f5f0] to-[#e9dfd0] dark:from-[#1f1b16] dark:to-[#15120e]">
+    <section className="w-full px-6 py-16 bg-gradient-to-b from-[#f8f5f0] to-[#e9dfd0] dark:from-[#1f1b16] dark:to-[#15120e]">
       {/* Section Header */}
       <div className="max-w-3xl mx-auto text-center mb-12">
         <h2 className="text-4xl font-bold mb-4 text-gray-900 dark:text-white">

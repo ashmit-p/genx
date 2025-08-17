@@ -14,7 +14,6 @@ export async function POST(req: Request) {
     const decodedToken = await adminAuth.verifyIdToken(token);
     const userId = decodedToken.uid;
 
-    // Fetch username from users collection
     const userDoc = await adminDb.collection('users').doc(userId).get();
     
     if (!userDoc.exists) {
@@ -30,7 +29,6 @@ export async function POST(req: Request) {
 
     let slug = slugify(title, { lower: true, strict: true });
 
-    // Check if slug exists in blog_submissions
     const submissionsRef = adminDb.collection('blog_submissions');
     const existingSubmission = await submissionsRef.where('slug', '==', slug).get();
 

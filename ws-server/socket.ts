@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import { getGeminiResponse } from './lib/ai/gemini';
+import { personalities } from './lib/ai/personalities';
 import { db } from './firebase';
 import { getAuth } from 'firebase-admin/auth';
 import { Server, Socket } from 'socket.io';
@@ -12,6 +13,7 @@ interface ChatMessage {
   user_id: string;
   username: string;
   message: string;
+  personality?: keyof typeof personalities;
 }
 
 async function saveMessageToContext(roomId: string, message: string) {
@@ -82,7 +84,7 @@ export default function socketHandler(io: Server) {
       const user = socket.data.user;
       if (!user) return socket.emit('error', 'Unauthorized');
 
-      const { room_id, message } = data;
+      const { room_id, message, personality = 'supportive' } = data;
       const isAIChat = room_id.startsWith('ai-');
 
       try {
@@ -106,6 +108,7 @@ export default function socketHandler(io: Server) {
             role: 'user',
             content: message,
             avatar_url,
+            personality,
             inserted_at: new Date(),
           };
           
@@ -123,14 +126,16 @@ export default function socketHandler(io: Server) {
             inserted_at: new Date().toISOString(),
           });
 
-          const botReply = await getGeminiResponse(message, contextMessages);
+          const botReply = await getGeminiResponse(message, contextMessages, personality);
+          const selectedPersonality = personalities[personality] || personalities.supportive;
 
           const botMessage = {
             room_id,
-            user_id: user.uid,
+            user_id: 'ai-bot', // Use a distinct AI bot ID for storage too
             role: 'assistant',
             content: botReply,
             avatar_url: '/bot-avatar.jpg',
+            personality,
             inserted_at: new Date(),
           };
 
@@ -139,8 +144,8 @@ export default function socketHandler(io: Server) {
           io.to(room_id).emit('receive_message', {
             id: botDoc.id,
             room_id,
-            user_id: user.uid,
-            username: 'TherapistBot',
+            user_id: 'ai-bot', // Use a distinct AI bot ID
+            username: selectedPersonality.name,
             content: botReply,
             avatar_url: '/bot-avatar.jpg',
             inserted_at: new Date().toISOString(),
